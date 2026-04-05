@@ -1,0 +1,5 @@
+{
+  "name": "StudyFlow AI",
+  "description": "An intelligent study assistant that analyzes documents (PDF, Word, PPTX) to provide Q&A, generate quizzes, and create custom printable question papers.",
+  "requestFramePermissions": []
+}

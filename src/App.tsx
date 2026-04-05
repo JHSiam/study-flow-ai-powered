@@ -26,8 +26,6 @@ import { twMerge } from 'tailwind-merge';
 import { DocumentData, Question, QuizResult } from './types';
 import { askQuestion, generateQuestions } from './services/ai';
 
-// PDF.js worker setup
-// Using unpkg for better reliability with specific versions
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 function cn(...inputs: ClassValue[]) {
@@ -38,21 +36,18 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'study' | 'quiz' | 'export'>('study');
   const [document, setDocument] = useState<DocumentData | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  
-  // Chat state
+
   const [messages, setMessages] = useState<{ role: 'user' | 'ai', content: string }[]>([]);
   const [input, setInput] = useState('');
   const [isAsking, setIsAsking] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Quiz state
   const [quizQuestions, setQuizQuestions] = useState<Question[]>([]);
   const [quizConfig, setQuizConfig] = useState({ mcq: 5, board: 2 });
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
 
-  // Export state
   const [exportTemplate, setExportTemplate] = useState<'standard' | 'modern' | 'minimal'>('standard');
 
   useEffect(() => {
@@ -80,7 +75,6 @@ export default function App() {
       if (file.type === 'application/pdf') {
         const arrayBuffer = await file.arrayBuffer();
         const text = await extractTextFromPDF(arrayBuffer);
-        
         setDocument({
           id: Math.random().toString(36).substr(2, 9),
           name: file.name,
@@ -106,7 +100,7 @@ export default function App() {
           content: text
         });
       }
-      
+
       setMessages([{ role: 'ai', content: `I've analyzed "${file.name}". How can I help you study today? You can ask questions or generate a quiz.` }]);
     } catch (error) {
       console.error('Upload error:', error);
@@ -126,7 +120,7 @@ export default function App() {
 
     try {
       const answer = await askQuestion(document.content, userMsg);
-      setMessages(prev => [...prev, { role: 'ai', content: answer || 'Sorry, I couldn\'t find an answer.' }]);
+      setMessages(prev => [...prev, { role: 'ai', content: answer || "Sorry, I couldn't find an answer." }]);
     } catch (error) {
       setMessages(prev => [...prev, { role: 'ai', content: 'Error connecting to AI. Please check your Groq API key.' }]);
     } finally {
@@ -139,24 +133,23 @@ export default function App() {
     setIsGeneratingQuiz(true);
     setQuizResult(null);
     setUserAnswers({});
-    
+
     try {
       let mcqs: Question[] = [];
       let boards: Question[] = [];
-      
+
       if (quizConfig.mcq > 0) {
         mcqs = await generateQuestions(document.content, 'mcq', quizConfig.mcq);
       }
-      
-      // Small delay between requests to avoid hitting TPM limit
+
       if (quizConfig.mcq > 0 && quizConfig.board > 0) {
         await new Promise(resolve => setTimeout(resolve, 3000));
       }
-      
+
       if (quizConfig.board > 0) {
         boards = await generateQuestions(document.content, 'board', quizConfig.board);
       }
-      
+
       setQuizQuestions([...mcqs, ...boards]);
     } catch (error) {
       alert('Failed to generate quiz. Please check your Groq API key.');
@@ -177,18 +170,13 @@ export default function App() {
       };
     });
 
-    setQuizResult({
-      score,
-      total: quizQuestions.length,
-      answers
-    });
+    setQuizResult({ score, total: quizQuestions.length, answers });
   };
 
   const downloadPDF = () => {
     const doc = new jsPDF();
     const title = document?.name || 'Question Paper';
-    
-    // Header
+
     doc.setFontSize(22);
     doc.text(title, 105, 20, { align: 'center' });
     doc.setFontSize(12);
@@ -197,20 +185,19 @@ export default function App() {
 
     let y = 45;
 
-    // MCQs
     const mcqs = quizQuestions.filter(q => q.type === 'mcq');
     if (mcqs.length > 0) {
       doc.setFontSize(16);
       doc.text('Section A: Multiple Choice Questions', 20, y);
       y += 10;
-      
+
       mcqs.forEach((q, i) => {
         if (y > 270) { doc.addPage(); y = 20; }
         doc.setFontSize(12);
         const lines = doc.splitTextToSize(`${i + 1}. ${q.question}`, 170);
         doc.text(lines, 20, y);
-        y += (lines.length * 7);
-        
+        y += lines.length * 7;
+
         q.options?.forEach((opt, j) => {
           const char = String.fromCharCode(65 + j);
           doc.text(`${char}) ${opt}`, 30, y);
@@ -220,7 +207,6 @@ export default function App() {
       });
     }
 
-    // Board Questions
     const boards = quizQuestions.filter(q => q.type === 'board');
     if (boards.length > 0) {
       if (y > 250) { doc.addPage(); y = 20; }
@@ -234,63 +220,80 @@ export default function App() {
         doc.setFontSize(12);
         const lines = doc.splitTextToSize(`${i + 1}. ${q.question}`, 170);
         doc.text(lines, 20, y);
-        y += (lines.length * 7) + 20; // Space for answer
+        y += lines.length * 7 + 20;
       });
     }
 
-    doc.save(`${title.replace(/\.[^/.]+$/, "")}_Questions.pdf`);
+    doc.save(`${title.replace(/\.[^/.]+$/, '')}_Questions.pdf`);
   };
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans">
-      {/* Sidebar */}
-      <nav className="fixed left-0 top-0 h-full w-20 bg-white border-r border-gray-200 flex flex-col items-center py-8 gap-8 z-50">
-        <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-200 mb-4">
-          <BookOpen size={28} />
+      {/* Sidebar — widened to w-24 to fit labels */}
+      <nav className="fixed left-0 top-0 h-full w-24 bg-white border-r border-gray-200 flex flex-col items-center py-8 gap-2 z-50">
+        {/* Logo */}
+        <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-200 mb-6">
+          <BookOpen size={26} />
         </div>
-        
-        <button 
+
+        {/* Study */}
+        <button
           onClick={() => setActiveTab('study')}
           className={cn(
-            "p-3 rounded-xl transition-all duration-200",
-            activeTab === 'study' ? "bg-indigo-50 text-indigo-600" : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+            "flex flex-col items-center gap-1 w-full px-2 py-3 rounded-xl transition-all duration-200",
+            activeTab === 'study'
+              ? "bg-indigo-50 text-indigo-600"
+              : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
           )}
         >
-          <MessageSquare size={24} />
-        </button>
-        
-        <button 
-          onClick={() => setActiveTab('quiz')}
-          className={cn(
-            "p-3 rounded-xl transition-all duration-200",
-            activeTab === 'quiz' ? "bg-indigo-50 text-indigo-600" : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
-          )}
-        >
-          <CheckCircle2 size={24} />
-        </button>
-        
-        <button 
-          onClick={() => setActiveTab('export')}
-          className={cn(
-            "p-3 rounded-xl transition-all duration-200",
-            activeTab === 'export' ? "bg-indigo-50 text-indigo-600" : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
-          )}
-        >
-          <Printer size={24} />
+          <MessageSquare size={20} />
+          <span className="text-[11px] font-medium leading-none">Study</span>
         </button>
 
+        {/* Quiz */}
+        <button
+          onClick={() => setActiveTab('quiz')}
+          className={cn(
+            "flex flex-col items-center gap-1 w-full px-2 py-3 rounded-xl transition-all duration-200",
+            activeTab === 'quiz'
+              ? "bg-indigo-50 text-indigo-600"
+              : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+          )}
+        >
+          <CheckCircle2 size={20} />
+          <span className="text-[11px] font-medium leading-none">Quiz</span>
+        </button>
+
+        {/* Print / Export */}
+        <button
+          onClick={() => setActiveTab('export')}
+          className={cn(
+            "flex flex-col items-center gap-1 w-full px-2 py-3 rounded-xl transition-all duration-200",
+            activeTab === 'export'
+              ? "bg-indigo-50 text-indigo-600"
+              : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+          )}
+        >
+          <Printer size={20} />
+          <span className="text-[11px] font-medium leading-none">Print</span>
+        </button>
+
+        {/* Settings at bottom */}
         <div className="mt-auto">
-          <button className="p-3 text-gray-400 hover:text-gray-600 rounded-xl">
-            <Settings size={24} />
+          <button className="flex flex-col items-center gap-1 w-full px-2 py-3 text-gray-400 hover:text-gray-600 rounded-xl transition-all duration-200">
+            <Settings size={20} />
+            <span className="text-[11px] font-medium leading-none">Settings</span>
           </button>
         </div>
       </nav>
 
-      {/* Main Content */}
-      <main className="pl-20 min-h-screen">
+      {/* Main Content — offset matches new sidebar width */}
+      <main className="pl-24 min-h-screen">
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 sticky top-0 z-40">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold tracking-tight text-gray-900">StudyFlow <span className="text-indigo-600">AI</span></h1>
+            <h1 className="text-xl font-bold tracking-tight text-gray-900">
+              StudyFlow <span className="text-indigo-600">AI</span>
+            </h1>
             {document && (
               <div className="flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-full text-sm font-medium text-gray-600 border border-gray-200">
                 <FileText size={14} />
@@ -301,7 +304,7 @@ export default function App() {
               </div>
             )}
           </div>
-          
+
           <div className="flex items-center gap-4">
             {!document && (
               <label className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg cursor-pointer transition-colors shadow-sm font-medium">
@@ -321,11 +324,15 @@ export default function App() {
                 <Upload size={48} />
               </div>
               <h2 className="text-3xl font-bold text-gray-900 mb-2">Ready to master your studies?</h2>
-              <p className="text-gray-500 max-w-md mb-8">Upload a PDF, Word document, or text file to start asking questions, generating quizzes, and creating custom question papers.</p>
+              <p className="text-gray-500 max-w-md mb-8">
+                Upload a PDF, Word document, or text file to start asking questions, generating quizzes, and creating custom question papers.
+              </p>
               <label className="group relative flex flex-col items-center justify-center w-full max-w-lg h-64 border-2 border-dashed border-gray-300 rounded-3xl bg-white hover:bg-gray-50 hover:border-indigo-400 transition-all cursor-pointer">
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                   <Upload className="w-12 h-12 mb-4 text-gray-400 group-hover:text-indigo-500 transition-colors" />
-                  <p className="mb-2 text-sm text-gray-500"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                  <p className="mb-2 text-sm text-gray-500">
+                    <span className="font-semibold">Click to upload</span> or drag and drop
+                  </p>
                   <p className="text-xs text-gray-400">PDF, DOCX, or TXT (MAX. 50MB)</p>
                 </div>
                 <input type="file" className="hidden" accept=".pdf,.docx,.txt" onChange={handleFileUpload} />
@@ -339,8 +346,9 @@ export default function App() {
             </div>
           ) : (
             <AnimatePresence mode="wait">
+              {/* ── Study / Chat tab ── */}
               {activeTab === 'study' && (
-                <motion.div 
+                <motion.div
                   key="study"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -349,14 +357,11 @@ export default function App() {
                 >
                   <div className="flex-1 overflow-y-auto pr-4 space-y-6 mb-4 custom-scrollbar">
                     {messages.map((msg, i) => (
-                      <div key={i} className={cn(
-                        "flex w-full",
-                        msg.role === 'user' ? "justify-end" : "justify-start"
-                      )}>
+                      <div key={i} className={cn("flex w-full", msg.role === 'user' ? "justify-end" : "justify-start")}>
                         <div className={cn(
                           "max-w-[80%] p-4 rounded-2xl shadow-sm",
-                          msg.role === 'user' 
-                            ? "bg-indigo-600 text-white rounded-tr-none" 
+                          msg.role === 'user'
+                            ? "bg-indigo-600 text-white rounded-tr-none"
                             : "bg-white border border-gray-100 text-gray-800 rounded-tl-none"
                         )}>
                           <div className="prose prose-sm max-w-none dark:prose-invert">
@@ -375,9 +380,9 @@ export default function App() {
                     )}
                     <div ref={chatEndRef} />
                   </div>
-                  
+
                   <div className="relative">
-                    <input 
+                    <input
                       type="text"
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
@@ -385,7 +390,7 @@ export default function App() {
                       placeholder="Ask anything about the document..."
                       className="w-full bg-white border border-gray-200 rounded-2xl px-6 py-4 pr-16 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                     />
-                    <button 
+                    <button
                       onClick={handleSendMessage}
                       disabled={!input.trim() || isAsking}
                       className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -396,8 +401,9 @@ export default function App() {
                 </motion.div>
               )}
 
+              {/* ── Quiz tab ── */}
               {activeTab === 'quiz' && (
-                <motion.div 
+                <motion.div
                   key="quiz"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -410,13 +416,15 @@ export default function App() {
                         <Award size={40} />
                       </div>
                       <h3 className="text-2xl font-bold text-gray-900 mb-4">Generate Your Quiz</h3>
-                      <p className="text-gray-500 mb-8">Challenge yourself with AI-generated questions based on your document content.</p>
-                      
+                      <p className="text-gray-500 mb-8">
+                        Challenge yourself with AI-generated questions based on your document content.
+                      </p>
+
                       <div className="grid grid-cols-2 gap-6 mb-8">
                         <div className="space-y-2 text-left">
                           <label className="text-sm font-semibold text-gray-700">MCQs (Multiple Choice)</label>
-                          <input 
-                            type="number" 
+                          <input
+                            type="number"
                             min="0" max="20"
                             value={quizConfig.mcq}
                             onChange={(e) => setQuizConfig(prev => ({ ...prev, mcq: parseInt(e.target.value) || 0 }))}
@@ -425,8 +433,8 @@ export default function App() {
                         </div>
                         <div className="space-y-2 text-left">
                           <label className="text-sm font-semibold text-gray-700">Board Questions (Descriptive)</label>
-                          <input 
-                            type="number" 
+                          <input
+                            type="number"
                             min="0" max="10"
                             value={quizConfig.board}
                             onChange={(e) => setQuizConfig(prev => ({ ...prev, board: parseInt(e.target.value) || 0 }))}
@@ -435,7 +443,7 @@ export default function App() {
                         </div>
                       </div>
 
-                      <button 
+                      <button
                         onClick={handleGenerateQuiz}
                         disabled={isGeneratingQuiz}
                         className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2"
@@ -466,7 +474,7 @@ export default function App() {
                               <p className="text-sm font-medium text-gray-500">Your Score</p>
                               <p className="text-2xl font-black text-indigo-600">{quizResult.score} / {quizResult.total}</p>
                             </div>
-                            <button 
+                            <button
                               onClick={() => setQuizQuestions([])}
                               className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2 rounded-xl font-bold transition-colors"
                             >
@@ -474,7 +482,7 @@ export default function App() {
                             </button>
                           </div>
                         ) : (
-                          <button 
+                          <button
                             onClick={handleSubmitQuiz}
                             className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-indigo-100 transition-all"
                           >
@@ -485,12 +493,17 @@ export default function App() {
 
                       <div className="space-y-6">
                         {quizQuestions.map((q, i) => (
-                          <div key={q.id} className={cn(
-                            "bg-white p-8 rounded-3xl border transition-all",
-                            quizResult 
-                              ? (quizResult.answers.find(a => a.questionId === q.id)?.isCorrect ? "border-green-200 bg-green-50/30" : "border-red-200 bg-red-50/30")
-                              : "border-gray-100 shadow-sm"
-                          )}>
+                          <div
+                            key={q.id}
+                            className={cn(
+                              "bg-white p-8 rounded-3xl border transition-all",
+                              quizResult
+                                ? (quizResult.answers.find(a => a.questionId === q.id)?.isCorrect
+                                  ? "border-green-200 bg-green-50/30"
+                                  : "border-red-200 bg-red-50/30")
+                                : "border-gray-100 shadow-sm"
+                            )}
+                          >
                             <div className="flex items-start gap-4 mb-6">
                               <span className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-sm font-bold text-gray-500">
                                 {i + 1}
@@ -525,7 +538,7 @@ export default function App() {
                               </div>
                             ) : (
                               <div className="ml-12 space-y-4">
-                                <textarea 
+                                <textarea
                                   disabled={!!quizResult}
                                   value={userAnswers[q.id] || ''}
                                   onChange={(e) => setUserAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
@@ -540,7 +553,7 @@ export default function App() {
                                 )}
                               </div>
                             )}
-                            
+
                             {quizResult && (
                               <div className="mt-6 ml-12 p-4 bg-gray-50 rounded-xl border border-gray-100">
                                 <p className="text-sm font-bold text-gray-700 mb-1">Explanation:</p>
@@ -555,8 +568,9 @@ export default function App() {
                 </motion.div>
               )}
 
+              {/* ── Export / Print tab ── */}
               {activeTab === 'export' && (
-                <motion.div 
+                <motion.div
                   key="export"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -569,7 +583,7 @@ export default function App() {
                         <h3 className="text-2xl font-bold text-gray-900">Printable Question Paper</h3>
                         <p className="text-gray-500">Customize and download your study material as a professional PDF.</p>
                       </div>
-                      <button 
+                      <button
                         onClick={downloadPDF}
                         disabled={quizQuestions.length === 0}
                         className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 disabled:opacity-50"
@@ -580,7 +594,7 @@ export default function App() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                      <button 
+                      <button
                         onClick={() => setExportTemplate('standard')}
                         className={cn(
                           "p-6 rounded-2xl border-2 text-left transition-all",
@@ -593,8 +607,8 @@ export default function App() {
                         <h4 className="font-bold text-gray-900">Standard</h4>
                         <p className="text-xs text-gray-500 mt-1">Classic academic layout with clear sections.</p>
                       </button>
-                      
-                      <button 
+
+                      <button
                         onClick={() => setExportTemplate('modern')}
                         className={cn(
                           "p-6 rounded-2xl border-2 text-left transition-all",
@@ -608,7 +622,7 @@ export default function App() {
                         <p className="text-xs text-gray-500 mt-1">Clean, spacious design with bold headers.</p>
                       </button>
 
-                      <button 
+                      <button
                         onClick={() => setExportTemplate('minimal')}
                         className={cn(
                           "p-6 rounded-2xl border-2 text-left transition-all",
@@ -625,8 +639,10 @@ export default function App() {
 
                     {quizQuestions.length === 0 ? (
                       <div className="bg-gray-50 rounded-2xl p-12 text-center border border-dashed border-gray-200">
-                        <p className="text-gray-500 mb-4">No questions generated yet. Go to the Quiz tab to create some questions first.</p>
-                        <button 
+                        <p className="text-gray-500 mb-4">
+                          No questions generated yet. Go to the Quiz tab to create some questions first.
+                        </p>
+                        <button
                           onClick={() => setActiveTab('quiz')}
                           className="text-indigo-600 font-bold hover:underline"
                         >
@@ -649,13 +665,13 @@ export default function App() {
                               <span>TOTAL MARKS: {quizQuestions.length * 5}</span>
                             </div>
                           </div>
-                          
+
                           <div className="space-y-6">
                             <div className="space-y-4">
                               <h5 className="text-xs font-black border-l-4 border-indigo-600 pl-2">SECTION A: OBJECTIVE</h5>
                               {quizQuestions.filter(q => q.type === 'mcq').slice(0, 3).map((q, i) => (
                                 <div key={i} className="text-[10px] space-y-1">
-                                  <p className="font-bold">Q{i+1}. {q.question}</p>
+                                  <p className="font-bold">Q{i + 1}. {q.question}</p>
                                   <div className="grid grid-cols-2 gap-x-4 pl-4 text-gray-600">
                                     {q.options?.map((opt, idx) => (
                                       <span key={idx}>{String.fromCharCode(97 + idx)}) {opt}</span>
@@ -664,7 +680,9 @@ export default function App() {
                                 </div>
                               ))}
                               {quizQuestions.filter(q => q.type === 'mcq').length > 3 && (
-                                <p className="text-[8px] text-gray-400 italic text-center">... and {quizQuestions.filter(q => q.type === 'mcq').length - 3} more questions</p>
+                                <p className="text-[8px] text-gray-400 italic text-center">
+                                  ... and {quizQuestions.filter(q => q.type === 'mcq').length - 3} more questions
+                                </p>
                               )}
                             </div>
                           </div>
@@ -680,19 +698,10 @@ export default function App() {
       </main>
 
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #E2E8F0;
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #CBD5E0;
-        }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #CBD5E0; }
       `}</style>
     </div>
   );
